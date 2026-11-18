@@ -83,3 +83,7 @@ core, what goes on demand, and the size budgets that keep the core from growing.
 I designed the model and directed AI coding agents to implement and revise it, reviewing
 and validating the results myself. Multi-model design reviews shaped several parts of the
 generator; comments in `sync-memory.sh` cite the findings they address.
+
+## License
+
+Copyright 2026 Innocent Kironji. Licensed under the Apache License, Version 2.0; see `LICENSE`.
