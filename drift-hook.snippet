@@ -1,0 +1,16 @@
+
+# >>> ai-memory-drift-check >>>
+# Warn (only) if the generated AI-memory files have drifted from ~/.ai-memory sources.
+# Read-only: runs `sync-memory.sh --check`, never writes. Interactive shells only.
+# Non-fatal: any error is swallowed so it can never break shell startup.
+# Remove this block (between the >>> / <<< markers) to disable.
+case $- in
+  *i*)
+    if [ -x "$HOME/.ai-memory/sync-memory.sh" ]; then
+      if ! "$HOME/.ai-memory/sync-memory.sh" --check >/dev/null 2>&1; then
+        printf '\033[33m[ai-memory] drift or issue detected — run: ~/.ai-memory/sync-memory.sh --check (then --write)\033[0m\n' 2>/dev/null || true
+      fi
+    fi
+    ;;
+esac
+# <<< ai-memory-drift-check <<<

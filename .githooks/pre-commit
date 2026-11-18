@@ -1,0 +1,37 @@
+#!/bin/sh
+# ~/.ai-memory pre-commit secret-scan (belt-and-suspenders with sync-memory.sh C3).
+# Blocks a commit that would introduce a credential VALUE (not just an env-var name).
+# Scans staged .md / .sh sources; ignores content inside fenced ``` code blocks to
+# cut false positives. This is a policy control, not tamper-proof (same-UID box).
+set -eu
+
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(md|sh)$' || true)
+[ -z "$staged" ] && exit 0
+
+# Secret VALUE patterns (deliberately conservative). env-var NAMES like TOKEN=$FOO
+# or "$OPENAI_API_KEY" are allowed; assigned literal values / key material are not.
+fail=0
+for f in $staged; do
+  [ -f "$f" ] || continue
+  # Strip fenced code blocks, then scan.
+  scanned=$(awk '/^```/{fence=!fence; next} !fence{print}' "$f")
+  # Match: KEY= followed by a non-$ literal of length >= 12; PEM headers; PRIVATE-TOKEN: <value>
+  hits=$(printf '%s\n' "$scanned" | grep -nEi \
+    '(-----BEGIN [A-Z ]*PRIVATE KEY-----)|((API[_-]?KEY|SECRET|TOKEN|PASSWORD|PRIVATE-TOKEN|JIRA_TOKEN|CONFLUENCE_TOKEN|GITLAB_TOKEN)[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+_.-]{12,})' \
+    || true)
+  # Allow the obvious safe form: value is a shell var reference ($VAR or ${VAR}).
+  hits=$(printf '%s\n' "$hits" | grep -vE '[:=][[:space:]]*["'"'"']?\$\{?[A-Za-z_]' || true)
+  if [ -n "$hits" ]; then
+    echo "pre-commit: possible secret VALUE in $f:" >&2
+    printf '%s\n' "$hits" >&2
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "COMMIT BLOCKED: redact the value(s) above (reference secrets by env-var NAME only)." >&2
+  echo "If this is a false positive, wrap the example in a fenced \`\`\` code block or fix the pattern." >&2
+  exit 1
+fi
+exit 0
